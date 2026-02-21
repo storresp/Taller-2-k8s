@@ -1,75 +1,64 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 // Variable reactiva para el valor del input de texto
 const inputValue = ref('')
 
-// Lista reactiva que almacena todos los valores registrados (se actualiza desde el backend)
+// Lista reactiva con todos los registros devueltos por el backend
 const itemList = ref([])
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTA BACKEND: La URL base del backend Django.
-// Actualmente el backend solo tiene el endpoint GET /polls/ que devuelve
-// "Hello, world." y NO guarda ni devuelve datos de la base de datos.
-//
-// Para que este frontend funcione completamente, el backend necesita:
-//   1. Un endpoint POST /polls/items/ → que reciba { "value": "..." }
-//      y lo guarde en la base de datos.
-//   2. Un endpoint GET /polls/items/ → que devuelva la lista de todos
-//      los items guardados en formato JSON: [{ "id": 1, "value": "..." }, ...]
-//   3. Habilitar CORS en Django (instalar django-cors-headers y configurarlo
-//      en settings.py) para que Vue pueda hacer peticiones al backend.
-//
-// URL A AJUSTAR cuando el backend esté listo:
-const API_BASE_URL = 'http://localhost:8000/polls'
-// ─────────────────────────────────────────────────────────────────────────────
+// Indicador de estado: 'idle' | 'loading' | 'error'
+const status = ref('idle')
 
-// Función que se ejecuta al presionar el botón
+// URL base del backend Django — usando ruta relativa para que el proxy
+// de Vite redirija la petición a http://localhost:8000 sin errores de CORS
+const API_BASE_URL = '/polls'
+
+// ─── Cargar la lista al montar el componente ───────────────────────────────
+onMounted(() => {
+  loadItems()
+})
+
+// ─── Enviar un nuevo registro al backend ──────────────────────────────────
 async function handleSubmit() {
   const value = inputValue.value.trim()
   if (!value) return
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // NOTA BACKEND: Esta llamada POST requiere que el backend tenga implementado
-  // el endpoint POST /polls/items/ que acepte JSON { "value": "..." } y lo
-  // guarde en la base de datos. Actualmente ese endpoint NO existe en el back.
-  // ─────────────────────────────────────────────────────────────────────────
+  status.value = 'loading'
   try {
-    await fetch(`${API_BASE_URL}/items/`, {
+    // POST /polls/answers/ — campo requerido por el modelo Django: "answer_text"
+    const res = await fetch(`${API_BASE_URL}/answers/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: value })
+      body: JSON.stringify({ answer_text: value })
     })
 
-    // Limpiar el input después de enviar
-    inputValue.value = ''
+    if (!res.ok) {
+      console.error('Error del servidor:', await res.text())
+      status.value = 'error'
+      return
+    }
 
-    // Recargar la lista desde el backend después de guardar
+    inputValue.value = ''
+    status.value = 'idle'
+
+    // Recargar la lista actualizada desde el backend
     await loadItems()
   } catch (error) {
-    // ─────────────────────────────────────────────────────────────────────
-    // NOTA BACKEND: Si el backend no está corriendo o el endpoint no existe,
-    // la petición fallará y caerá aquí. Una vez el backend esté completo,
-    // este catch solo debería manejar errores reales de red.
-    // ─────────────────────────────────────────────────────────────────────
-    console.error('Error al enviar al backend:', error)
+    console.error('Error de red al enviar:', error)
+    status.value = 'error'
   }
 }
 
-// Función para obtener todos los items guardados desde el backend
+// ─── Obtener todos los registros guardados ────────────────────────────────
 async function loadItems() {
-  // ─────────────────────────────────────────────────────────────────────────
-  // NOTA BACKEND: Esta llamada GET requiere que el backend tenga implementado
-  // el endpoint GET /polls/items/ que devuelva un array JSON con todos los
-  // items guardados. Actualmente ese endpoint NO existe en el back.
-  // ─────────────────────────────────────────────────────────────────────────
   try {
-    const response = await fetch(`${API_BASE_URL}/items/`)
+    // GET /polls/answers/ — devuelve: [{ id, answer_text, pub_date }, ...]
+    const response = await fetch(`${API_BASE_URL}/answers/`)
     const data = await response.json()
-    // Se espera que el backend devuelva un array: [{ id, value }, ...]
     itemList.value = data
   } catch (error) {
-    console.error('Error al cargar items del backend:', error)
+    console.error('Error de red al cargar items:', error)
   }
 }
 </script>
@@ -99,8 +88,8 @@ async function loadItems() {
           />
 
           <!-- Botón que envía el valor al backend -->
-          <button class="submit-btn" @click="handleSubmit">
-             Guardar
+          <button class="submit-btn" :disabled="status === 'loading'" @click="handleSubmit">
+            {{ status === 'loading' ? 'Guardando...' : 'Guardar' }}
           </button>
         </div>
       </div>
@@ -112,24 +101,24 @@ async function loadItems() {
       <div class="list-section">
         <h2 class="list-title"> Nombres registrados</h2>
 
-        <!--
-          NOTA BACKEND: Esta lista se pobla con los datos que devuelve el backend.
-          Mientras el backend esté incompleto, la lista permanecerá vacía.
-        -->
+        <!-- Lista poblada con los datos del backend: GET /polls/answers/ -->
         <ul v-if="itemList.length > 0" class="item-list">
           <li
             v-for="item in itemList"
             :key="item.id"
             class="item"
           >
-            <span class="item-icon">☠️</span>
-            {{ item.value }}
+            <div class="item-content">
+              <!-- item.answer_text es el campo del modelo Django Answer -->
+              <span class="item-name">{{ item.answer_text }}</span>
+              <span class="item-date">{{ item.pub_date }}</span>
+            </div>
           </li>
         </ul>
 
         <!-- Mensaje cuando no hay datos aún -->
         <div v-else class="empty-state">
-          <span class="empty-icon">📖</span>
+          <span class="empty-icon"></span>
           <p class="empty-msg">El cuaderno está vacío...</p>
         </div>
       </div>
@@ -259,6 +248,13 @@ body {
   transform: translateY(0);
 }
 
+.submit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* ── Separador ── */
 .divider {
   height: 1px;
@@ -284,15 +280,11 @@ body {
 }
 
 .item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   padding: 12px 16px;
   background: #0f0f0f;
   border: 1px solid #222;
   border-radius: 10px;
   color: #d0d0d0;
-  font-size: 0.95rem;
   transition: border-color 0.2s, background 0.2s;
 }
 
@@ -301,8 +293,25 @@ body {
   border-color: #3a1a1a;
 }
 
-.item-icon {
-  font-size: 1rem;
+/* Contenedor flex para nombre + fecha */
+.item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.item-name {
+  font-size: 0.95rem;
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.item-date {
+  font-size: 0.72rem;
+  color: #555;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 

@@ -15,4 +15,14 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    proxy: {
+      // Todas las peticiones a /polls/* se redirigen al backend Django
+      // Esto evita el error de CORS sin necesidad de modificar el backend
+      '/polls': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      }
+    }
+  }
 })

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +26,7 @@ SECRET_KEY = 'django-insecure-0e@a70b-fl89r3ruleh3leu9tx)w-11-d@ccqor%prpjgb$w1)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -73,11 +74,16 @@ WSGI_APPLICATION = 'tallerbackend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+  "default": {
+    "ENGINE": "django.db.backends.postgresql",
+    "NAME": os.getenv("POSTGRES_DB", "appdb"),
+    "USER": os.getenv("POSTGRES_USER", "appuser"),
+    "PASSWORD": os.getenv("POSTGRES_PASSWORD", "apppass"),
+    "HOST": os.getenv("POSTGRES_HOST", "postgres"),
+    "PORT": os.getenv("POSTGRES_PORT", "5432"),
+  }
 }
 
 

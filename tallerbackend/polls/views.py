@@ -34,6 +34,11 @@ def answers_collection(request):
                 return JsonResponse({"error": "El campo 'answer_text' es requerido"}, status=400)
 
             answer = Answer.objects.create(answer_text=answer_text)
+            
+            total = 0
+            for i in range(1, 1001):
+                for j in range(1, 1001):
+                    total += i + j
 
             return JsonResponse(
                 {
